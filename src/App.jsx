@@ -112,12 +112,14 @@ export default function MovieApp() {
   );
 
   return (
-    <div className={`${darkMode ? 'bg-gray-900 text-white' : 'bg-gray-100 text-black'} min-h-screen p-4 sm:p-6 md:p-8 lg:p-10 xl:p-12 w-full max-w-full font-sans`}>
+    <div className={`${
+        'bg-black text-white'
+      } min-h-screen w-full font-sans flex flex-col items-center justify-start px-4 sm:px-6 md:px-10 lg:px-16 xl:px-24`}>
       <header className="flex flex-col items-center justify-center text-center mb-8 px-2">
         <h1 className="text-4xl sm:text-5xl font-extrabold text-purple-600 drop-shadow-lg mb-4 md:mb-0 text-center">
           🎬 Movies Galaxy
         </h1>
-        <div className="space-x-2">
+        <div className="space-x-2 mt-4">
           <button onClick={() => setDarkMode(!darkMode)} className="px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-white rounded shadow">
             {darkMode ? '☀️ Light Mode' : '🌙 Dark Mode'}
           </button>
@@ -135,12 +137,12 @@ export default function MovieApp() {
         </select>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 justify-items-center">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4 w-full max-w-full px-2">
         {filteredMovies.map((movie, idx) => (
-          <div key={movie.id || idx} className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg overflow-hidden border border-gray-200 dark:border-gray-700 hover:shadow-xl transition w-full">
-            <div className="p-4">
-              <h2 className="text-xl font-semibold mb-2">{movie.title}</h2>
-              <p className="text-sm text-purple-500 mb-1 font-medium">{movie.genre}</p>
+          <div key={movie.id || idx} className="bg-white dark:bg-gray-800 rounded-md shadow hover:scale-105 transition duration-300 overflow-hidden border dark:border-gray-700 w-full">
+            <div className="p-2 text-center">
+              <h2 className="text-sm font-bold truncate">{movie.title}</h2>
+              <p className="text-xs text-black mb-1 bg-white inline-block px-2 py-0.5 rounded">{movie.genre}</p>
               <p className="text-sm mb-4 line-clamp-3">{movie.description}</p>
               <div className="w-full aspect-video rounded-lg overflow-hidden bg-black mb-4">
                 <video src={movie.link} controls controlsList="nodownload" className="w-full h-full rounded-lg border" poster={movie.poster} preload="metadata" style={{ backgroundColor: '#000' }}></video>
