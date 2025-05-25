@@ -1,11 +1,14 @@
+// Dark mode toggle, genre filter, and comment support for logged-in users with star ratings and timestamps
 import { useState, useEffect } from "react";
-import { Play } from "lucide-react";
 import { initializeApp } from "firebase/app";
 import {
   getFirestore,
   collection,
   addDoc,
-  getDocs
+  getDocs,
+  doc,
+  deleteDoc,
+  onSnapshot
 } from "firebase/firestore";
 import {
   getAuth,
@@ -29,10 +32,29 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
 
+function timeAgo(dateStr) {
+  const now = new Date();
+  const posted = new Date(dateStr);
+  const seconds = Math.floor((now - posted) / 1000);
+  const minutes = Math.floor(seconds / 60);
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
+
+  if (days > 0) return `${days} day${days > 1 ? 's' : ''} ago`;
+  if (hours > 0) return `${hours} hour${hours > 1 ? 's' : ''} ago`;
+  if (minutes > 0) return `${minutes} minute${minutes > 1 ? 's' : ''} ago`;
+  return 'Just now';
+}
+
 export default function MovieApp() {
   const [search, setSearch] = useState("");
   const [user, setUser] = useState(null);
   const [movies, setMovies] = useState([]);
+  const [comments, setComments] = useState({});
+  const [newComment, setNewComment] = useState("");
+  const [newRating, setNewRating] = useState(0);
+  const [genreFilter, setGenreFilter] = useState("");
+  const [darkMode, setDarkMode] = useState(false);
   const [formData, setFormData] = useState({
     title: "",
     description: "",
@@ -50,84 +72,105 @@ export default function MovieApp() {
 
   const fetchMovies = async () => {
     const snapshot = await getDocs(collection(db, "movies"));
-    const moviesList = snapshot.docs.map(doc => doc.data());
+    const moviesList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     setMovies(moviesList);
+
+    moviesList.forEach(movie => {
+      const commentRef = collection(db, "movies", movie.id, "comments");
+      onSnapshot(commentRef, snapshot => {
+        setComments(prev => ({
+          ...prev,
+          [movie.id]: snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
+        }));
+      });
+    });
   };
 
-  const handleLogin = () => {
-    const email = prompt("Email");
-    const password = prompt("Password");
-    signInWithEmailAndPassword(auth, email, password).catch(alert);
+  const handleAddComment = async (movieId) => {
+    if (!user || !newComment.trim() || newRating === 0) return;
+    const commentData = {
+      text: newComment,
+      email: user.email,
+      createdAt: new Date().toISOString(),
+      rating: newRating
+    };
+    await addDoc(collection(db, "movies", movieId, "comments"), commentData);
+    setNewComment("");
+    setNewRating(0);
   };
 
-  const handleRegister = () => {
-    const email = prompt("Register Email");
-    const password = prompt("Password");
-    createUserWithEmailAndPassword(auth, email, password).catch(alert);
+  const handleDeleteComment = async (movieId, commentId) => {
+    if (!isAdmin) return;
+    await deleteDoc(doc(db, "movies", movieId, "comments", commentId));
   };
 
-  const handleLogout = () => signOut(auth);
-
-  const handleAddMovie = async () => {
-    await addDoc(collection(db, "movies"), formData);
-    setFormData({ title: "", description: "", genre: "", poster: "", link: "" });
-    fetchMovies();
-  };
+  const genres = [...new Set(movies.map(m => m.genre))];
 
   const filteredMovies = movies.filter(movie =>
-    movie.title.toLowerCase().includes(search.toLowerCase())
+    movie.title.toLowerCase().includes(search.toLowerCase()) &&
+    (genreFilter === "" || movie.genre === genreFilter)
   );
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
-      <div className="flex justify-between mb-4">
-        <h1 className="text-4xl font-bold">🎬 Movies Galaxy</h1>
+    <div className={`${darkMode ? 'bg-gray-900 text-white' : 'bg-gray-100 text-black'} min-h-screen p-4 sm:p-6 md:p-8 lg:p-10 xl:p-12 w-full max-w-full font-sans`}>
+      <header className="flex flex-col md:flex-row justify-between items-center mb-8 px-2">
+        <h1 className="text-4xl sm:text-5xl font-extrabold text-purple-600 drop-shadow-lg mb-4 md:mb-0 text-center">
+          🎬 Movies Galaxy
+        </h1>
         <div className="space-x-2">
-          {!user && <button className="px-4 py-2 bg-blue-500 text-white rounded" onClick={handleLogin}>Login</button>}
-          {!user && <button className="px-4 py-2 bg-green-500 text-white rounded" onClick={handleRegister}>Register</button>}
-          {user && <button className="px-4 py-2 bg-red-500 text-white rounded" onClick={handleLogout}>Logout</button>}
+          <button onClick={() => setDarkMode(!darkMode)} className="px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-white rounded shadow">
+            {darkMode ? '☀️ Light Mode' : '🌙 Dark Mode'}
+          </button>
+          {!user && <button className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded shadow" onClick={() => signInWithEmailAndPassword(auth, prompt('Email'), prompt('Password')).catch(alert)}>Login</button>}
+          {!user && <button className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded shadow" onClick={() => createUserWithEmailAndPassword(auth, prompt('Register Email'), prompt('Password')).catch(alert)}>Register</button>}
+          {user && <button className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded shadow" onClick={() => signOut(auth)}>Logout</button>}
         </div>
+      </header>
+
+      <div className="mb-6 flex flex-wrap gap-2">
+        <input className="p-3 flex-1 min-w-[200px] border border-gray-300 rounded-lg shadow-sm" placeholder="🔍 Search for a movie..." value={search} onChange={(e) => setSearch(e.target.value)} />
+        <select className="p-3 border border-gray-300 rounded-lg shadow-sm" value={genreFilter} onChange={(e) => setGenreFilter(e.target.value)}>
+          <option value="">All Genres</option>
+          {genres.map((genre, i) => <option key={i} value={genre}>{genre}</option>)}
+        </select>
       </div>
 
-      {isAdmin && (
-        <div className="mb-6 grid gap-2 grid-cols-1 md:grid-cols-2 lg:grid-cols-5">
-          <input className="p-2 border" placeholder="Title" value={formData.title} onChange={e => setFormData({ ...formData, title: e.target.value })} />
-          <input className="p-2 border" placeholder="Genre" value={formData.genre} onChange={e => setFormData({ ...formData, genre: e.target.value })} />
-          <input className="p-2 border" placeholder="Description" value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} />
-          <input className="p-2 border" placeholder="Poster URL" value={formData.poster} onChange={e => setFormData({ ...formData, poster: e.target.value })} />
-          <input className="p-2 border" placeholder="OneDrive Link" value={formData.link} onChange={e => setFormData({ ...formData, link: e.target.value })} />
-          <button onClick={handleAddMovie} className="col-span-full px-4 py-2 bg-purple-600 text-white rounded">Add Movie</button>
-        </div>
-      )}
-
-      <input
-        className="mb-6 w-full max-w-md mx-auto block p-2 border"
-        placeholder="Search for a movie..."
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-      />
-
-      <div className="grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
         {filteredMovies.map((movie, idx) => (
-          <div key={idx} className="rounded-2xl shadow-lg overflow-hidden bg-white">
-            <img
-              src={movie.poster}
-              alt={movie.title}
-              className="w-full h-64 object-cover"
-            />
+          <div key={movie.id || idx} className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg overflow-hidden border border-gray-200 dark:border-gray-700 hover:shadow-xl transition w-full">
             <div className="p-4">
               <h2 className="text-xl font-semibold mb-2">{movie.title}</h2>
-              <p className="text-sm text-gray-600 mb-1">{movie.genre}</p>
-              <p className="text-sm text-gray-800 mb-4">{movie.description}</p>
-              <a
-                href={movie.link}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <button className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-black text-white rounded">
-                  <Play className="w-4 h-4" /> Watch Now
-                </button>
-              </a>
+              <p className="text-sm text-purple-500 mb-1 font-medium">{movie.genre}</p>
+              <p className="text-sm mb-4 line-clamp-3">{movie.description}</p>
+              <div className="w-full aspect-video rounded-lg overflow-hidden bg-black mb-4">
+                <video src={movie.link} controls controlsList="nodownload" className="w-full h-full rounded-lg border" poster={movie.poster} preload="metadata" style={{ backgroundColor: '#000' }}></video>
+              </div>
+              {user && (
+                <div className="space-y-2">
+                  <textarea className="w-full p-2 border rounded text-black" placeholder="Leave a comment..." value={newComment} onChange={(e) => setNewComment(e.target.value)}></textarea>
+                  <div className="flex items-center space-x-1">
+                    {[1,2,3,4,5].map((star) => (
+                      <span key={star} className={`cursor-pointer text-xl ${newRating >= star ? 'text-yellow-400' : 'text-gray-400'}`} onClick={() => setNewRating(star)}>★</span>
+                    ))}
+                  </div>
+                  <button onClick={() => handleAddComment(movie.id)} className="px-4 py-1 bg-blue-500 text-white rounded">💬 Post Comment</button>
+                </div>
+              )}
+              <div className="mt-4">
+                <h3 className="font-bold text-sm mb-2">Comments:</h3>
+                {(comments[movie.id] || []).map((c, i) => (
+                  <div key={c.id || i} className="text-sm border-t py-2 flex justify-between items-start">
+                    <div>
+                      <strong>{c.email}</strong> • <span className="text-xs text-gray-500">{timeAgo(c.createdAt)}</span>
+                      <div>{c.text}</div>
+                      <div className="text-yellow-400 text-sm">{'★'.repeat(c.rating || 0)}</div>
+                    </div>
+                    {isAdmin && (
+                      <button onClick={() => handleDeleteComment(movie.id, c.id)} className="text-red-500 text-xs">🗑 Delete</button>
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         ))}
