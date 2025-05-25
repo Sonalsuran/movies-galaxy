@@ -113,7 +113,7 @@ export default function MovieApp() {
 
   return (
     <div className={`${darkMode ? 'bg-gray-900 text-white' : 'bg-gray-100 text-black'} min-h-screen p-4 sm:p-6 md:p-8 lg:p-10 xl:p-12 w-full max-w-full font-sans`}>
-      <header className="flex flex-col md:flex-row justify-between items-center mb-8 px-2">
+      <header className="flex flex-col items-center justify-center text-center mb-8 px-2">
         <h1 className="text-4xl sm:text-5xl font-extrabold text-purple-600 drop-shadow-lg mb-4 md:mb-0 text-center">
           🎬 Movies Galaxy
         </h1>
@@ -127,7 +127,7 @@ export default function MovieApp() {
         </div>
       </header>
 
-      <div className="mb-6 flex flex-wrap gap-2">
+      <div className="mb-6 flex flex-wrap gap-2 justify-center">
         <input className="p-3 flex-1 min-w-[200px] border border-gray-300 rounded-lg shadow-sm" placeholder="🔍 Search for a movie..." value={search} onChange={(e) => setSearch(e.target.value)} />
         <select className="p-3 border border-gray-300 rounded-lg shadow-sm" value={genreFilter} onChange={(e) => setGenreFilter(e.target.value)}>
           <option value="">All Genres</option>
@@ -135,7 +135,7 @@ export default function MovieApp() {
         </select>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 justify-items-center">
         {filteredMovies.map((movie, idx) => (
           <div key={movie.id || idx} className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg overflow-hidden border border-gray-200 dark:border-gray-700 hover:shadow-xl transition w-full">
             <div className="p-4">
